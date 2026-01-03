@@ -1,0 +1,1510 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Solar System English Learning Game</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Outfit:wght@300;400;600&display=swap"
+        rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <style>
+        :root {
+            --primary: #818cf8;
+            --primary-glow: rgba(129, 140, 248, 0.4);
+            --secondary: #c084fc;
+            --accent: #f472b6;
+            --bg: #020617;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --glass: rgba(15, 23, 42, 0.6);
+            --glass-border: rgba(255, 255, 255, 0.1);
+            --panel-shadow: 0 0 60px rgba(0, 0, 0, 0.6);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Outfit', sans-serif;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        body {
+            background-color: var(--bg);
+            color: var(--text-main);
+            overflow: hidden;
+            width: 100vw;
+            height: 100vh;
+        }
+
+        h1,
+        h2,
+        .orbitron {
+            font-family: 'Orbitron', sans-serif;
+            letter-spacing: 2px;
+        }
+
+        #bg-canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            z-index: 0;
+        }
+
+        .glass-panel {
+            background: #0f172a;
+            /* Solid dark blue/slate */
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 24px;
+            padding: 24px;
+            pointer-events: auto;
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.9);
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            z-index: 10000;
+        }
+
+        #hud {
+            position: absolute;
+            top: 30px;
+            left: 30px;
+            z-index: 10;
+            pointer-events: none;
+        }
+
+        #planet-info {
+            position: absolute;
+            bottom: 40px;
+            left: 50%;
+            transform: translate(-50%, 20px);
+            width: 90%;
+            max-width: 900px;
+            height: 75vh;
+            display: none;
+            flex-direction: column;
+            z-index: 20;
+            opacity: 0;
+        }
+
+        #planet-info.active {
+            opacity: 1;
+            transform: translate(-50%, 0);
+        }
+
+        .tabs {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 24px;
+            padding: 4px;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 12px;
+        }
+
+        .tab-btn {
+            flex: 1;
+            background: transparent;
+            border: none;
+            color: var(--text-muted);
+            padding: 12px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 14px;
+            transition: all 0.3s;
+            text-transform: uppercase;
+        }
+
+        .tab-btn.active {
+            background: var(--primary);
+            color: white;
+            box-shadow: 0 0 20px var(--primary-glow);
+        }
+
+        .content-area {
+            flex: 1;
+            overflow-y: auto;
+            padding-right: 15px;
+            line-height: 1.6;
+            font-size: 17px;
+        }
+
+        .content-area::-webkit-scrollbar {
+            width: 5px;
+        }
+
+        .content-area::-webkit-scrollbar-thumb {
+            background: var(--glass-border);
+            border-radius: 10px;
+        }
+
+        .arabic {
+            direction: rtl;
+            font-family: 'Outfit', sans-serif;
+            margin-top: 20px;
+            color: var(--text-muted);
+            background: rgba(129, 140, 248, 0.05);
+            padding: 20px;
+            border-radius: 12px;
+            border-right: 4px solid var(--primary);
+        }
+
+        /* --- Audio Engine Styles --- */
+        .speaker-btn {
+            background: rgba(129, 140, 248, 0.1);
+            border: 1px solid rgba(129, 140, 248, 0.2);
+            color: #818cf8;
+            cursor: pointer;
+            font-size: 1em;
+            padding: 6px 10px;
+            border-radius: 8px;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .speaker-btn:hover {
+            background: var(--primary);
+            color: white;
+            transform: scale(1.05);
+        }
+
+        .speaker-btn.playing {
+            animation: vocab-pulse 1s infinite;
+            background: #22c55e;
+            color: white;
+            border-color: #22c55e;
+        }
+
+        @keyframes vocab-pulse {
+            0% {
+                transform: scale(1);
+            }
+
+            50% {
+                transform: scale(1.05);
+            }
+
+            100% {
+                transform: scale(1);
+            }
+        }
+
+        .vocab-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 20px;
+            padding: 10px;
+        }
+
+        .vocab-card {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 16px;
+            padding: 20px;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .vocab-card:hover {
+            background: rgba(255, 255, 255, 0.05);
+            border-color: rgba(129, 140, 248, 0.3);
+            transform: translateY(-4px);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+        }
+
+        .context-sentence {
+            font-size: 0.9em;
+            color: #94a3b8;
+            font-style: italic;
+            border-top: 1px solid rgba(255, 255, 255, 0.05);
+            padding-top: 12px;
+            margin-top: 4px;
+            line-height: 1.4;
+        }
+
+        .example-box {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid var(--glass-border);
+            border-radius: 12px;
+            padding: 16px;
+            margin: 12px 0;
+        }
+
+        .close-btn {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            width: 40px;
+            height: 40px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--glass-border);
+            border-radius: 50%;
+            color: white;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            transition: all 0.3s;
+        }
+
+        .close-btn:hover {
+            background: var(--accent);
+            transform: rotate(90deg);
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 6px 14px;
+            border-radius: 30px;
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            background: rgba(129, 140, 248, 0.2);
+            color: var(--primary);
+            margin-bottom: 12px;
+        }
+
+        .points-display {
+            font-size: 28px;
+            font-weight: 700;
+            font-family: 'Orbitron', sans-serif;
+            background: linear-gradient(135deg, #818cf8, #c084fc);
+            background-clip: text;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        /* Practice Styling */
+        .option-btn {
+            display: block;
+            width: 100%;
+            padding: 12px;
+            margin: 8px 0;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--glass-border);
+            border-radius: 8px;
+            color: white;
+            text-align: left;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .option-btn:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .option-btn.correct {
+            background: rgba(34, 197, 94, 0.2);
+            border-color: #22c55e;
+        }
+
+        .option-btn.wrong {
+            background: rgba(239, 68, 68, 0.2);
+            border-color: #ef4444;
+        }
+
+        [dir="rtl"] .option-btn {
+            text-align: right;
+        }
+
+        @media (max-width: 600px) {
+            #planet-info {
+                height: 85vh;
+                bottom: 20px;
+            }
+        }
+
+        .grammar-section {
+            margin-bottom: 24px;
+        }
+
+        .grammar-label {
+            font-size: 12px;
+            font-weight: 800;
+            color: var(--primary);
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .grammar-label::after {
+            content: "";
+            height: 1px;
+            flex: 1;
+            background: linear-gradient(to right, var(--primary-glow), transparent);
+        }
+
+        .formula-card {
+            background: rgba(129, 140, 248, 0.1);
+            border: 1px solid var(--primary-glow);
+            padding: 16px;
+            border-radius: 12px;
+            font-family: 'Orbitron', sans-serif;
+            font-size: 14px;
+            color: white;
+            margin-bottom: 16px;
+        }
+
+        .grammar-matrix {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 12px;
+            margin-top: 15px;
+        }
+
+        .matrix-cell {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--glass-border);
+            border-radius: 12px;
+            padding: 12px;
+            font-size: 13px;
+        }
+
+        .matrix-header {
+            color: var(--primary);
+            font-weight: 800;
+            font-size: 11px;
+            text-transform: uppercase;
+            margin-bottom: 8px;
+            letter-spacing: 1px;
+        }
+
+        .learning-toast {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%) translateY(-100px);
+            background: #ef4444;
+            color: white;
+            padding: 16px 24px;
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            z-index: 20000;
+            transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            text-align: center;
+            max-width: 90%;
+            font-weight: 600;
+        }
+
+        .learning-toast.show {
+            transform: translateX(-50%) translateY(0);
+        }
+
+        .toast-ar {
+            display: block;
+            font-size: 14px;
+            margin-top: 5px;
+            opacity: 0.9;
+        }
+
+        /* --- Word Function Advanced Styles --- */
+        .function-context {
+            color: var(--primary);
+            font-weight: 700;
+            font-size: 0.9em;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .function-context::before {
+            content: '';
+            display: block;
+            width: 30px;
+            height: 2px;
+            background: var(--primary);
+            border-radius: 2px;
+        }
+
+        .function-columns {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            margin-bottom: 30px;
+        }
+
+        .function-col {
+            background: rgba(255, 255, 255, 0.02);
+            padding: 20px;
+            border-radius: 16px;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            line-height: 1.7;
+        }
+
+        .realtalk-section {
+            background: rgba(129, 140, 248, 0.05);
+            border: 1px dashed rgba(129, 140, 248, 0.2);
+            border-radius: 16px;
+            padding: 24px;
+        }
+
+        .realtalk-header {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 0.85em;
+            color: #818cf8;
+            margin-bottom: 16px;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .realtalk-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+
+        .phrase-btn {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: #f8fafc;
+            padding: 10px 18px;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 0.95em;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .phrase-btn:hover {
+            background: var(--primary);
+            border-color: var(--primary);
+            transform: translateY(-2px);
+        }
+
+        .phrase-btn.playing {
+            animation: vocab-pulse 1s infinite;
+            background: #22c55e;
+            border-color: #22c55e;
+        }
+
+        /* --- Dialogue Styles --- */
+        .dialogue-section {
+            margin-top: 40px;
+            background: rgba(255, 255, 255, 0.02);
+            border-radius: 20px;
+            padding: 24px;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .dialogue-bubble {
+            display: flex;
+            flex-direction: column;
+            margin-bottom: 16px;
+            padding: 12px 18px;
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 12px;
+            border-left: 3px solid var(--primary);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .dialogue-bubble:hover {
+            background: rgba(255, 255, 255, 0.06);
+            transform: translateX(5px);
+        }
+
+        .dialogue-speaker {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 0.75em;
+            color: var(--primary);
+            margin-bottom: 6px;
+            text-transform: uppercase;
+        }
+
+        .dialogue-text {
+            color: #fff;
+            font-size: 1.05em;
+            margin-bottom: 4px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .dialogue-ar {
+            color: var(--text-dim);
+            font-size: 0.95em;
+            opacity: 0.8;
+        }
+    </style>
+</head>
+
+<body>
+    <canvas id="bg-canvas"></canvas>
+
+    <div id="hud">
+        <div class="glass-panel">
+            <div class="status-badge">MISSION PROGRESS</div>
+            <div class="points-display">TOTAL POINTS: <span id="total-points">0</span></div>
+            <div id="planet-status" style="margin-top: 10px; font-size: 14px; opacity: 0.8;">
+                Click a planet to start learning
+            </div>
+        </div>
+    </div>
+
+    <div id="planet-info" class="glass-panel">
+        <button class="close-btn">&times;</button>
+        <h2 id="planet-title" style="margin-bottom: 5px;">Planet Name</h2>
+        <div id="planet-subtitle" style="opacity: 0.7; margin-bottom: 20px; font-size: 14px;">Focus Area</div>
+
+        <div class="tabs">
+            <button class="tab-btn active" data-tab="grammar">Grammar</button>
+            <button class="tab-btn" data-tab="vocabulary">Vocabulary</button>
+            <button class="tab-btn" data-tab="function">Word Function</button>
+            <button class="tab-btn" data-tab="practice">Practice</button>
+        </div>
+
+        <div id="tab-content" class="content-area">
+            <!-- Dynamic Content -->
+        </div>
+    </div>
+
+    <script>
+        // --- Data Structure ---
+        const units = [
+            {
+                id: 1,
+                name: "Good Morning!",
+                focus: "Verb 'be' & Greetings",
+                completedTabs: new Set(),
+                grammar: {
+                    noteEn: "In English, every sentence needs a verb. We use 'am', 'is', and 'are' to talk about who we are or how we feel. In Arabic, this verb is often hidden in the present tense, but in English, you must say it!",
+                    noteAr: "في اللغة الإنجليزية، تحتاج كل جملة إلى فعل. نستخدم 'am' و 'is' و 'are' للتحدث عن هويتنا أو شعورنا. في اللغة العربية، غالباً ما يكون هذا الفعل مستتراً في المضارع، لكن في الإنجليزية يجب ذكره!",
+                    form: [
+                        "Affirmative (+): Subject + be (I am, You are, He/She is).",
+                        "Negative (-): Add not after be (I am not, He is not).",
+                        "Question (?): Move be to the start (Are you...?)."
+                    ],
+                    examples: [
+                        "\"I am a student.\"",
+                        "\"He is not a teacher.\"",
+                        "\"Is she your friend?\""
+                    ],
+                    logic: [
+                        "Identifies roles and names.",
+                        "English sentences MUST have a verb.",
+                        "Be links subjects to descriptors."
+                    ]
+                },
+                practice: {
+                    questions: [
+                        { q: "What do you say to someone at 8:00 AM?", options: ["Good morning", "Good evening"], answer: 0, wrongEn: "Wrong! 8:00 AM is in the morning.", wrongAr: "خطأ! الساعة 8 صباحاً تكون في الصباح." },
+                        { q: "___ name is Omar. Nice to meet you.", options: ["My", "His"], answer: 0, wrongEn: "Wrong! Use 'My' to introduce yourself.", wrongAr: "خطأ! استخدم 'My' لتقديم نفسك." },
+                        { q: "How do you introduce a friend?", options: ["This is my friend, Ali", "I am Ali"], answer: 0, wrongEn: "Wrong! Use 'This is...' to introduce others.", wrongAr: "خطأ! استخدم 'This is...' لتقديم الآخرين." },
+                        { q: "I use a ___ to write in my notebook.", options: ["Pencil", "Eraser"], answer: 0, wrongEn: "Wrong! We write with pencils, not erasers.", wrongAr: "خطأ! نحن نكتب بالأقلام الرصاص، وليس بالمساحات." },
+                        { q: "\"Goodbye\" is a way to say hello.", options: ["True", "False"], answer: 1, wrongEn: "Wrong! 'Goodbye' is for leaving, not for hello.", wrongAr: "خطأ! 'Goodbye' للوداع وليس للتحية." },
+                        { q: "A \"Classmate\" is a person in your school.", options: ["True", "False"], answer: 0, wrongEn: "Wrong! A classmate is definitely a student in your school.", wrongAr: "خطأ! زميل الدراسة هو بالتأكيد طالب في مدرستك." }
+                    ]
+                },
+                vocabulary: {
+                    list: [
+                        { en: "Principal", ar: "مدير المدرسة", context: "The principal is in his office." },
+                        { en: "Classmate", ar: "زميل دراسة", context: "Ali is my classmate in English." },
+                        { en: "Teacher", ar: "معلم", context: "Mr. Ahmed is my math teacher." },
+                        { en: "Student", ar: "طالب", context: "I am a student at the middle school." },
+                        { en: "Alphabet", ar: "الحروف الأبجدية", context: "We learn the alphabet in Unit 1." },
+                        { en: "Morning", ar: "صباح", context: "We say \"Good morning\" at 8:00 AM." },
+                        { en: "Afternoon", ar: "بعد الظهر", context: "Class ends in the afternoon." },
+                        { en: "Evening", ar: "مساء", context: "I do my homework in the evening." },
+                        { en: "Friend", ar: "صديق", context: "This is my best friend, Omar." }
+                    ]
+                },
+                function: {
+                    context: "Meeting people for the first time or during different parts of the day.",
+                    howEn: "In English, we use different greetings based on the time. Titles like Mr. and Mrs. are used with last names to show respect to teachers and adults. When meeting someone, \"Nice to meet you\" is the standard polite response.",
+                    howAr: "في اللغة الإنجليزية، نستخدم تحيات مختلفة بناءً على الوقت. تُستخدم الألقاب مثل Mr. و Mrs. مع ألقاب العائلات لإظهار الاحترام للمعلمين والكبار. عند مقابلة شخص ما، تعتبر عبارة \"Nice to meet you\" هي الرد المهذب المعتاد.",
+                    realTalk: ["How's it going?", "Nice to meet you", "Good morning"],
+                    dialogue: [
+                        { speaker: "A", text: "Good morning! How's it going?", ar: "صباح الخير! كيف تجري الأمور؟" },
+                        { speaker: "B", text: "I'm fine, thanks. My name is Ali.", ar: "أنا بخير، شكراً. اسمي علي." },
+                        { speaker: "A", text: "Nice to meet you, Ali. I'm Omar.", ar: "سعدت بلقائك يا علي. أنا عمر." }
+                    ]
+                }
+            },
+            {
+                id: 2,
+                name: "What Day Is Today?",
+                focus: "Time Prepositions (In/On)",
+                completedTabs: new Set(),
+                grammar: {
+                    noteEn: "Prepositions like 'in' and 'on' tell us exactly when something happens. Think of 'In' for big boxes of time (like months) and 'On' for specific points on a calendar (like days).",
+                    noteAr: "حروف الجر مثل 'in' و 'on' تخبرنا متى يحدث الشيء بالضبط. فكر في 'In' للفترات الزمنية الكبيرة (مثل الشهور) و 'On' للنقاط المحددة في التقويم (مثل الأيام).",
+                    form: [
+                        "Affirmative (+): Event + is + in/on + Time.",
+                        "Negative (-): Event + is not + Time.",
+                        "Question (?): When is / What is...?"
+                    ],
+                    examples: [
+                        "\"The test is on Monday.\"",
+                        "\"It is not in June.\"",
+                        "\"When is your birthday?\""
+                    ],
+                    logic: [
+                        "Use 'In' for whole months.",
+                        "Use 'On' only if you have a specific date like May 15th.",
+                        "Time acts as a location."
+                    ]
+                },
+                practice: {
+                    questions: [
+                        { q: "What day comes after Monday?", options: ["Sunday", "Tuesday"], answer: 1, wrongEn: "Wrong! Tuesday comes after Monday.", wrongAr: "خطأ! الثلاثاء يأتي بعد الاثنين." },
+                        { q: "How do you write the number 12?", options: ["Two", "Twelve"], answer: 1, wrongEn: "Wrong! 12 is 'Twelve'.", wrongAr: "خطأ! الرقم 12 هو 'Twelve'." },
+                        { q: "My birthday is ___ May.", options: ["On", "In"], answer: 1, wrongEn: "Wrong! Use 'In' for months.", wrongAr: "خطأ! استخدم 'In' للشهور." },
+                        { q: "Your teacher says: \"___ your books to page 10.\"", options: ["Close", "Open"], answer: 1, wrongEn: "Wrong! You need to 'Open' the book to see the page.", wrongAr: "خطأ! يجب أن 'تفتح' الكتاب لترى الصفحة." },
+                        { q: "January is the ___ month of the year.", options: ["Last", "First"], answer: 1, wrongEn: "Wrong! January is Month 1 (First).", wrongAr: "خطأ! يناير هو الشهر الأول." },
+                        { q: "There are 7 days in a week.", options: ["True", "False"], answer: 0, wrongEn: "Wrong! There are indeed 7 days in a week.", wrongAr: "خطأ! توجد بالفعل 7 أيام في الأسبوع." }
+                    ]
+                },
+                vocabulary: {
+                    list: [
+                        { en: "Sunday – Saturday", ar: "الأحد - السبت", context: "There are seven days in a week." },
+                        { en: "January – December", ar: "يناير - ديسمبر", context: "My birthday is in May." },
+                        { en: "Birthday", ar: "يوم ميلاد", context: "How old are you on your birthday?" },
+                        { en: "Today", ar: "اليوم", context: "Today is Monday." },
+                        { en: "Tomorrow", ar: "غداً", context: "Tomorrow is Tuesday." },
+                        { en: "Calendar", ar: "تقويم", context: "Look at the calendar for the date." },
+                        { en: "Number", ar: "رقم", context: "Twelve is my favorite number." },
+                        { en: "Scissors", ar: "مقص", context: "Use the scissors to cut the paper." }
+                    ]
+                },
+                function: {
+                    context: "Talking about ages, dates, and following school rules.",
+                    howEn: "We use ordinal numbers (1st, 2nd, 3rd) for dates instead of regular numbers. Classroom instructions use \"Imperatives\" (Command verbs) to tell students exactly what to do.",
+                    howAr: "نستخدم الأرقام الترتيبية (الأول، الثاني، الثالث) للتواريخ بدلاً من الأرقام العادية. تستخدم تعليمات الفصل الدراسي \"صيغة الأمر\" لإخبار الطلاب بما يجب عليهم فعله بالضبط.",
+                    realTalk: ["Open your books", "Please sit down", "How old are you?"],
+                    dialogue: [
+                        { speaker: "Teacher", text: "Please sit down and open your books.", ar: "من فضلك اجلس وافتح كتابك." },
+                        { speaker: "Student", text: "What page, please?", ar: "أي صفحة من فضلك؟" },
+                        { speaker: "Teacher", text: "Page 10. How old are you, Sara?", ar: "الصفحة 10. كم عمرك يا سارة؟" },
+                        { speaker: "Sara", text: "I am twelve years old.", ar: "عمري اثنا عشر عاماً." }
+                    ]
+                }
+            },
+            {
+                id: 3,
+                name: "What's That?",
+                focus: "Demonstratives (This/That)",
+                completedTabs: new Set(),
+                grammar: {
+                    noteEn: "We use 'This' and 'These' for things we can reach out and touch (Near). We use 'That' and 'Those' for things we point at from a distance (Far). Distance changes the word!",
+                    noteAr: "نستخدم 'This' و 'These' للأشياء التي يمكننا الوصول إليها ولمسها (قريب). ونستخدم 'That' و 'Those' للأشياء التي نشير إليها من مسافة (بعيد). المسافة تغير الكلمة!",
+                    form: [
+                        "Affirmative (+): This/That is... | These/Those are...",
+                        "Negative (-): This is not... | These are not...",
+                        "Question (?): What is that? | Are these...?"
+                    ],
+                    examples: [
+                        "\"That is an airplane (far).\"",
+                        "\"These are my keys (near).\"",
+                        "\"Is that a fossil?\""
+                    ],
+                    logic: [
+                        "This/These = Near you.",
+                        "That/Those = Far away.",
+                        "Near things you can touch."
+                    ]
+                },
+                practice: {
+                    questions: [
+                        { q: "___ are my sunglasses on the table here.", options: ["This", "These"], answer: 1, wrongEn: "Wrong! 'Sunglasses' is plural, so use 'These'.", wrongAr: "خطأ! 'Sunglasses' جمع، لذا استخدم 'These'." },
+                        { q: "Please ___ touch the art in the museum.", options: ["No", "Don't"], answer: 1, wrongEn: "Wrong! Use 'Don't' for negative commands.", wrongAr: "خطأ! استخدم 'Don't' للأوامر المنفية." },
+                        { q: "I use a ___ to take photos.", options: ["Camera", "Bicycle"], answer: 0, wrongEn: "Wrong! You take photos with a camera.", wrongAr: "خطأ! تلتقط الصور بالكاميرا." },
+                        { q: "Is that ___ eraser on the floor?", options: ["A", "An"], answer: 1, wrongEn: "Wrong! 'Eraser' starts with a vowel, so use 'An'.", wrongAr: "خطأ! 'Eraser' تبدأ بحرف متحرك، لذا استخدم 'An'." },
+                        { q: "What is the correct question for an object far away?", options: ["What is this", "What is that"], answer: 1, wrongEn: "Wrong! Use 'that' for things far away.", wrongAr: "خطأ! استخدم 'that' للأشياء البعيدة." },
+                        { q: "We use \"a\" before the word \"Notebook.\"", options: ["True", "False"], answer: 0, wrongEn: "Wrong! 'Notebook' starts with a consonant, so 'a' is correct.", wrongAr: "خطأ! 'Notebook' تبدأ بحرف ساكن، لذا فإن 'a' صحيحة." }
+                    ]
+                },
+                vocabulary: {
+                    list: [
+                        { en: "Camera", ar: "كاميرا", context: "I use a camera to take photos." },
+                        { en: "Calculator", ar: "آلة حاسبة", context: "Use a calculator for the math test." },
+                        { en: "Fossil", ar: "أحفورة", context: "Look at the dinosaur fossil." },
+                        { en: "Sculpture", ar: "تمثال / منحوتة", context: "Don't touch the sculpture in the museum." },
+                        { en: "Headphones", ar: "سماعات", context: "I listen to music with headphones." },
+                        { en: "Key", ar: "مفتاح", context: "This is the key to my house." },
+                        { en: "Laptop", ar: "حاسوب محمول", context: "I do my project on my laptop." },
+                        { en: "Souvenir", ar: "هدية تذكارية", context: "I bought this souvenir from the museum." }
+                    ]
+                },
+                function: {
+                    context: "Visiting a museum or asking about mysterious objects.",
+                    howEn: "Use \"What's this?\" for something in your hand and \"What's that?\" for something across the room. In museums, negative commands often start with \"Please don't\" to be polite but firm.",
+                    howAr: "استخدم \"What's this?\" لشيء في يدك و \"What's that?\" لشيء في طرف الغرفة الآخر. في المتاحف، تبدأ الأوامر المنفية غالباً بـ \"Please don't\" لتكون مهذباً ولكن حازماً.",
+                    realTalk: ["Check it out!", "Please don't touch", "What is that?"],
+                    dialogue: [
+                        { speaker: "Visitor", text: "Check it out! What is that?", ar: "تحقق من هذا! ما هذا؟" },
+                        { speaker: "Guard", text: "That is a dinosaur fossil. Please don't touch it.", ar: "تلك أحفورة ديناصور. من فضلك لا تلمسها." },
+                        { speaker: "Visitor", text: "Oh, sorry. It's amazing!", ar: "أوه، معذرة. إنها مذهلة!" }
+                    ]
+                }
+            },
+            {
+                id: 4,
+                name: "Around the World",
+                focus: "Origins & Countries",
+                completedTabs: new Set(),
+                grammar: {
+                    noteEn: "To tell people where you are from, we combine the verb 'be' with the word 'from'. It links your identity to your home country or city.",
+                    noteAr: "لإخبار الناس من أين أنت، نجمع بين الفعل 'be' وكلمة 'from'. إنها تربط هويتك ببلدك أو مدينتك الأصلية.",
+                    form: [
+                        "Affirmative (+): I am from... / They are Saudi.",
+                        "Negative (-): She is not (isn't) from Jordan.",
+                        "Question (?): Where are you from? / Are they...?"
+                    ],
+                    examples: [
+                        "\"We are from Egypt.\"",
+                        "\"He is not American.\"",
+                        "\"Is she from Oman?\""
+                    ],
+                    logic: [
+                        "Be + from = Origin.",
+                        "Negative adds 'not' to be.",
+                        "Questions swap Subject/Be."
+                    ]
+                },
+                practice: {
+                    questions: [
+                        { q: "Where ___ you from?", options: ["Are", "Is"], answer: 0, wrongEn: "Wrong! 'You' takes 'Are'.", wrongAr: "خطأ! 'You' تأخذ 'Are'." },
+                        { q: "A person from Saudi Arabia is ___.", options: ["Saudi", "Spain"], answer: 0, wrongEn: "Wrong! Spain is the country; Saudi is the nationality.", wrongAr: "خطأ! Spain هو البلد؛ Saudi هي الجنسية." },
+                        { q: "___ she from Jordan?", options: ["Am", "Is"], answer: 1, wrongEn: "Wrong! 'She' takes 'Is'.", wrongAr: "خطأ! 'She' تأخذ 'Is'." },
+                        { q: "What is the capital of Saudi Arabia?", options: ["Address", "Capital"], answer: 1, wrongEn: "Wrong! A country has a capital city.", wrongAr: "خطأ! للبلد مدينة عاصمة." },
+                        { q: "Where is he from? He is ___ Brazil.", options: ["In", "From"], answer: 1, wrongEn: "Wrong! Use 'From' for origin.", wrongAr: "خطأ! استخدم 'From' للمنشأ." },
+                        { q: "We ___ not from the USA.", options: ["Is", "Are"], answer: 1, wrongEn: "Wrong! 'We' takes 'Are'.", wrongAr: "خطأ! 'We' تأخذ 'Are'." },
+                        { q: "Riyadh is the capital city of Saudi Arabia.", options: ["True", "False"], answer: 0, wrongEn: "Wrong! Riyadh is indeed the capital.", wrongAr: "خطأ! الرياض هي بالفعل العاصمة." }
+                    ]
+                },
+                vocabulary: {
+                    list: [
+                        { en: "Capital", ar: "عاصمة", context: "Riyadh is the capital of Saudi Arabia." },
+                        { en: "City", ar: "مدينة", context: "Jeddah is a big city." },
+                        { en: "Country", ar: "بلد / دولة", context: "Which country are you from?" },
+                        { en: "Nationality", ar: "جنسية", context: "My nationality is Saudi." },
+                        { en: "Language", ar: "لغة", context: "Arabic is my first language." },
+                        { en: "Address", ar: "عنوان", context: "What is your home address?" },
+                        { en: "Website", ar: "موقع إلكتروني", context: "Visit our school website." }
+                    ]
+                },
+                function: {
+                    context: "Travel, meeting international students, and giving addresses.",
+                    howEn: "When someone asks \"Where are you from?\", they are asking for your country. If you want to be polite before asking a stranger a question, always start with \"Excuse me.\"",
+                    howAr: "عندما يسأل شخص ما \"من أين أنت؟\"، فهو يسأل عن بلدك. إذا كنت تريد أن تكون مهذباً قبل طرح سؤال على غريب، ابدأ دائماً بـ \"Excuse me\".",
+                    realTalk: ["Excuse me", "How about you?", "I'm from..."],
+                    dialogue: [
+                        { speaker: "Tourist", text: "Excuse me, where are you from?", ar: "معذرة، من أين أنت؟" },
+                        { speaker: "Fahad", text: "I'm from Saudi Arabia. How about you?", ar: "أنا من المملكة العربية السعودية. ماذا عنك؟" },
+                        { speaker: "Tourist", text: "I'm from England. I'm a student here.", ar: "أنا من إنجلترا. أنا طالب هنا." }
+                    ]
+                }
+            },
+            {
+                id: 5,
+                name: "Families, Families",
+                focus: "Possession & 's",
+                completedTabs: new Set(),
+                grammar: {
+                    noteEn: "In English, we show ownership in two ways: with the verb 'have' (I have a brother) or by adding 's to a person's name (Ali's car). It's like a tag that shows who owns what.",
+                    noteAr: "في اللغة الإنجليزية، نظهر الملكية بطريقتين: باستخدام الفعل 'have' (لدي أخ) أو بإضافة 's إلى اسم الشخص (سيارة علي). إنها مثل علامة توضح من يملك ماذا.",
+                    form: [
+                        "Affirmative (+): I have... / He has... / Ali's sister.",
+                        "Negative (-): I do not have... / He does not have...",
+                        "Question (?): Do you have...? / How many...?"
+                    ],
+                    examples: [
+                        "\"I have two brothers.\"",
+                        "\"She doesn't have a car.\"",
+                        "\"Do you have any cousins?\""
+                    ],
+                    logic: [
+                        "'s indicates ownership.",
+                        "Have/Has shows possession.",
+                        "Ahmed's = احمد يملك."
+                    ]
+                },
+                practice: {
+                    questions: [
+                        { q: "My father's sister is my ___.", options: ["Aunt", "Uncle"], answer: 0, wrongEn: "Wrong! A sister of your parent is an aunt.", wrongAr: "خطأ! أخت والدك هي عمتك (Aunt)." },
+                        { q: "___ any brothers?", options: ["Do you have", "Has"], answer: 0, wrongEn: "Wrong! Use 'Do you have' for questions with 'you'.", wrongAr: "خطأ! استخدم 'Do you have' للأسئلة مع الضمير 'you'." },
+                        { q: "I have two ___.", options: ["Children", "Child"], answer: 0, wrongEn: "Wrong! 'Two' needs a plural noun. 'Children' is the plural of 'Child'.", wrongAr: "خطأ! الرقم 'اثنان' يحتاج لاسم جمع. 'Children' هي جمع 'Child'." },
+                        { q: "This is ___ book. (belonging to Ali)", options: ["Ali's", "Alis"], answer: 0, wrongEn: "Wrong! Use 's to show that the book belongs to Ali.", wrongAr: "خطأ! استخدم 's لتوضيح أن الكتاب ملك لعلي." },
+                        { q: "The son of my brother is my ___.", options: ["Nephew", "Niece"], answer: 0, wrongEn: "Wrong! A 'Nephew' is a boy; a 'Niece' is a girl.", wrongAr: "خطأ! 'Nephew' هو الولد؛ بينما 'Niece' هي البنت." },
+                        { q: "Your father's father is your grandfather.", options: ["True", "False"], answer: 0, wrongEn: "Wrong! Your father's father is definitely your grandfather.", wrongAr: "خطأ! والد والدك هو بالتأكيد جدك." }
+                    ]
+                },
+                vocabulary: {
+                    list: [
+                        { en: "Aunt", ar: "عمة / خالة", context: "My father's sister is my aunt." },
+                        { en: "Uncle", ar: "عم / خال", context: "My mother's brother is my uncle." },
+                        { en: "Cousin", ar: "ابن عم / خال", context: "My cousin plays football with me." },
+                        { en: "Nephew", ar: "ابن الأخ / الأخت", context: "My brother has a son; he is my nephew." },
+                        { en: "Niece", ar: "ابنة الأخ / الأخت", context: "My sister has a daughter; she is my niece." },
+                        { en: "Grandparents", ar: "الأجداد", context: "I visit my grandparents on Friday." },
+                        { en: "Married", ar: "متزوج", context: "My brother is married." },
+                        { en: "Only child", ar: "طفل وحيد", context: "I have no brothers; I am an only child." }
+                    ]
+                },
+                function: {
+                    context: "Describing your family tree and siblings.",
+                    howEn: "We use \"Who\" to ask about people. To describe a large family, we use \"How many\" to count brothers and sisters. Use \"only child\" if you have no siblings.",
+                    howAr: "نستخدم \"Who\" للسؤال عن الأشخاص. ولوصف عائلة كبيرة، نستخدم \"How many\" لعد الإخوة والأخوات. استخدم \"only child\" إذا لم يكن لديك إخوة.",
+                    realTalk: ["Who is he?", "How many brothers...?", "This is Ali's father"],
+                    dialogue: [
+                        { speaker: "Ali", text: "This is my family photo.", ar: "هذه صورة عائلتي." },
+                        { speaker: "Friend", text: "Who is he?", ar: "من هو؟" },
+                        { speaker: "Ali", text: "This is my father. I have two brothers.", ar: "هذا والدي. لدي أخوان." },
+                        { speaker: "Friend", text: "How many brothers do you have?", ar: "كم عدداً من الإخوة لديك؟" }
+                    ]
+                }
+            },
+            {
+                id: 6,
+                name: "Is There a View?",
+                focus: "Existence & Furniture",
+                completedTabs: new Set(),
+                grammar: {
+                    noteEn: "We use 'There is' and 'There are' to describe what exists in a room or place. Use 'Is' for one thing and 'Are' for many things. It's like making a list of what you see!",
+                    noteAr: "نستخدم 'There is' و 'There are' لوصف ما هو موجود في غرفة أو مكان. استخدم 'Is' لشيء واحد و 'Are' لأشياء كثيرة. الأمر يشبه عمل قائمة بما تراه!",
+                    form: [
+                        "Affirmative (+): There is a rug. / There are two chairs.",
+                        "Negative (-): There isn't a TV. / There aren't any lamps.",
+                        "Question (?): Is there a garage? / Are there any...?"
+                    ],
+                    examples: [
+                        "\"There is a bed in the room.\"",
+                        "\"There are no flowers.\"",
+                        "\"Are there curtains?\""
+                    ],
+                    logic: [
+                        "There is = Singular (1).",
+                        "There are = Plural (2+).",
+                        "Describes what is inside."
+                    ]
+                },
+                practice: {
+                    questions: [
+                        { q: "We cook food in the ___.", options: ["Kitchen", "Bathroom"], answer: 0, wrongEn: "Wrong! We cook in the kitchen, not the bathroom.", wrongAr: "خطأ! نحن نطبخ في المطبخ، وليس في الحمام." },
+                        { q: "___ there a sofa in the living room?", options: ["Are", "Is"], answer: 1, wrongEn: "Wrong! 'A sofa' is singular. Use 'Is'.", wrongAr: "خطأ! 'A sofa' مفرد. استخدم 'Is'." },
+                        { q: "The cat is ___ the table (underneath it).", options: ["On", "Under"], answer: 1, wrongEn: "Wrong! 'Under' means underneath.", wrongAr: "خطأ! 'Under' تعني تحت." },
+                        { q: "I sleep on a ___ in my bedroom.", options: ["Stove", "Bed"], answer: 1, wrongEn: "Wrong! A stove is for cooking; a bed is for sleeping.", wrongAr: "خطأ! الموقد للطبخ؛ والسرير للنوم." },
+                        { q: "There ___ many flowers in the garden.", options: ["Is", "Are"], answer: 1, wrongEn: "Wrong! 'Many flowers' is plural. Use 'Are'.", wrongAr: "خطأ! 'Many flowers' جمع. استخدم 'Are'." },
+                        { q: "A \"Rug\" is usually found on the floor.", options: ["True", "False"], answer: 0, wrongEn: "Wrong! A rug is definitely a floor covering.", wrongAr: "خطأ! السجادة هي بالتأكيد غطاء للأرضية." },
+                        { q: "\"Upstairs\" means the top floor of a house.", options: ["True", "False"], answer: 0, wrongEn: "Wrong! 'Upstairs' refers to higher levels/floors.", wrongAr: "خطأ! 'Upstairs' تشير إلى المستويات/الطوابق العليا." }
+                    ]
+                },
+                vocabulary: {
+                    list: [
+                        { en: "Kitchen", ar: "مطبخ", context: "We cook food in the kitchen." },
+                        { en: "Bedroom", ar: "غرفة نوم", context: "I sleep in my bedroom." },
+                        { en: "Living room", ar: "غرفة المعيشة", context: "We watch TV in the living room." },
+                        { en: "Microwave", ar: "مايكرويف", context: "Heat the pizza in the microwave." },
+                        { en: "Refrigerator", ar: "ثلاجة", context: "Keep the milk in the refrigerator." },
+                        { en: "Rug", ar: "سجادة", context: "There is a rug on the floor." },
+                        { en: "Armchair", ar: "كرسي مريح", context: "My father sits in the armchair." },
+                        { en: "Cabinet", ar: "خزانة", context: "The plates are in the kitchen cabinet." }
+                    ]
+                },
+                function: {
+                    context: "Describing your house or a room to a friend.",
+                    howEn: "Use \"There is/are\" to list what is in a room. Prepositions (on, under, behind) are the \"Map\" of the sentence; they tell the listener exactly where to look for an object.",
+                    howAr: "استخدم \"There is/are\" لسرد ما يوجد في الغرفة. حروف الجر (على، تحت، خلف) هي \"الخريطة\" في الجملة؛ فهي تخبر المستمع بالضبط أين يبحث عن الشيء.",
+                    realTalk: ["Is there a view?", "It's very comfortable", "In front of..."],
+                    dialogue: [
+                        { speaker: "Friend", text: "Your new house is great! Is there a view?", ar: "منزلك الجديد رائع! هل توجد إطلالة؟" },
+                        { speaker: "Owner", text: "Yes, look! The garden is in front of the window.", ar: "نعم، انظر! الحديقة أمام النافذة." },
+                        { speaker: "Friend", text: "It's very comfortable here.", ar: "إنه مريح جداً هنا." }
+                    ]
+                }
+            },
+            {
+                id: 7,
+                name: "Where Do You Live?",
+                focus: "Directions & Commands",
+                completedTabs: new Set(),
+                grammar: {
+                    noteEn: "When we give directions or orders, we use the verb on its own without a subject (like 'I' or 'You'). This is called the Imperative. It's the most direct way to speak!",
+                    noteAr: "عندما نعطي توجيهات أو أوامر، نستخدم الفعل بمفرده بدون فاعل (مثل 'أنا' أو 'أنت'). يسمى هذا بصيغة الأمر. إنها الطريقة الأكثر مباشرة للتحدث!",
+                    form: [
+                        "Affirmative (+): Turn left. / The bank is next to...",
+                        "Negative (-): Do not (Don't) turn right.",
+                        "Question (?): Where do you live? / How can I get to...?"
+                    ],
+                    examples: [
+                        "\"Go straight.\"",
+                        "\"It is not near the bank.\"",
+                        "\"Where do you live?\""
+                    ],
+                    logic: [
+                        "Imperative = No subject.",
+                        "Next to = 1 place context.",
+                        "Between = 2 places context."
+                    ]
+                },
+                practice: {
+                    questions: [
+                        { q: "You buy medicine at a Pharmacy.", options: ["True", "False"], answer: 0, wrongEn: "Wrong! A pharmacy is where you get medicine.", wrongAr: "خطأ! الصيدلية هي المكان الذي تحصل منه على الدواء." },
+                        { q: "Where can you buy bread?", options: ["Supermarket", "Hospital"], answer: 0, wrongEn: "Wrong! You buy food at the supermarket.", wrongAr: "خطأ! تشتري الطعام من السوبر ماركت." },
+                        { q: "To get to the bank, go ___ (forward).", options: ["Straight", "Left"], answer: 0, wrongEn: "Wrong! 'Forward' refers to going straight.", wrongAr: "خطأ! كلمة 'Forward' تشير إلى الذهاب للأمام مباشرة." },
+                        { q: "The school is ___ the park and the mall.", options: ["Next to", "Between"], answer: 1, wrongEn: "Wrong! Use 'Between' when referring to two separate landmarks.", wrongAr: "خطأ! استخدم 'Between' عند الإشارة إلى معلمين منفصلين." },
+                        { q: "Turn ___ (opposite of right) at the corner.", options: ["Left", "Straight"], answer: 0, wrongEn: "Wrong! The opposite of right is left.", wrongAr: "خطأ! عكس اليمين هو اليسار." },
+                        { q: "You can find books at the ___.", options: ["Bookstore", "Post office"], answer: 0, wrongEn: "Wrong! A bookstore sells books.", wrongAr: "خطأ! متجر الكتب (Bookstore) يبيع الكتب." }
+                    ]
+                },
+                vocabulary: {
+                    list: [
+                        { en: "Pharmacy", ar: "صيدلية", context: "You buy medicine at the pharmacy." },
+                        { en: "Bookstore", ar: "مكتبة (لبيع الكتب)", context: "I buy my notebooks at the bookstore." },
+                        { en: "Post office", ar: "مكتب بريد", context: "Send the letter at the post office." },
+                        { en: "Supermarket", ar: "سوبر ماركت", context: "We buy food at the supermarket." },
+                        { en: "Bank", ar: "بنك", context: "I save my money in the bank." },
+                        { en: "Mall", ar: "مركز تسوق", context: "Let's go shopping at the mall." },
+                        { en: "Directions", ar: "اتجاهات", context: "Ask the man for directions." },
+                        { en: "Straight", ar: "مستقيم", context: "Go straight and then turn left." }
+                    ]
+                },
+                function: {
+                    context: "Navigating a city and asking for locations.",
+                    howEn: "When giving directions, be precise. Commands like 'Turn left' or 'Go straight' guide the listener. Use 'next to' or 'between' to describe locations relative to landmarks.",
+                    howAr: "عند إعطاء الاتجاهات، كن دقيقاً. الأوامر مثل 'Turn left' أو 'Go straight' توجه المستمع. استخدم 'next to' أو 'between' لوصف المواقع بالنسبة للمعالم.",
+                    realTalk: ["Where is the bank?", "Go straight", "Turn left at the corner"],
+                    dialogue: [
+                        { speaker: "Man", text: "Excuse me, where is the bank?", ar: "معذرة، أين البنك؟" },
+                        { speaker: "You", text: "Go straight and turn left at the corner.", ar: "اذهب مباشرة وانعطف يساراً عند الزاوية." },
+                        { speaker: "Man", text: "Is it next to the pharmacy?", ar: "هل هو بجوار الصيدلية؟" },
+                        { speaker: "You", text: "Yes, it is.", ar: "نعم، هو كذلك." }
+                    ]
+                }
+            },
+            {
+                id: 8,
+                name: "What Are You Doing?",
+                focus: "Present Progressive (-ing)",
+                completedTabs: new Set(),
+                grammar: {
+                    noteEn: "To talk about actions happening right now, we use 'be + -ing'. The '-ing' acts like a timer, showing that the action is still in progress at this exact moment.",
+                    noteAr: "للتحدث عن أفعال تحدث الآن، نستخدم 'be + -ing'. يعمل '-ing' مثل المؤقت، موضحاً أن الفعل لا يزال مستمراً في هذه اللحظة بالضبط.",
+                    form: [
+                        "Affirmative (+): Subject + be + verb-ing (He is eating).",
+                        "Negative (-): Subject + be + not + verb-ing.",
+                        "Question (?): be + Subject + verb-ing? (Are they working?)"
+                    ],
+                    examples: [
+                        "\"I am surfing the net.\"",
+                        "\"He is not (isn't) calling.\"",
+                        "\"Are you reading?\""
+                    ],
+                    logic: [
+                        "Action is happening NOW.",
+                        "-ing is the timer.",
+                        "I pairs with 'am'."
+                    ]
+                },
+                practice: {
+                    questions: [
+                        { q: "What are you doing? I am ____ my friend on the phone.", options: ["call", "calling"], answer: 1, wrongEn: "Wrong! For ongoing actions, use be + verb-ing.", wrongAr: "خطأ! للأفعال المستمرة، استخدم be + verb-ing." },
+                        { q: "He is ____ the internet in the computer lab.", options: ["surf", "surfing"], answer: 1, wrongEn: "Wrong! After 'is', use the -ing form for the present progressive.", wrongAr: "خطأ! بعد 'is'، استخدم صيغة -ing للمضارع المستمر." },
+                        { q: "Would you ____ to go to the mall?", options: ["like", "likes"], answer: 0, wrongEn: "Wrong! After 'Would you', use the base form 'like'.", wrongAr: "خطأ! بعد 'Would you'، استخدم الصيغة الأساسية 'like'." },
+                        { q: "They are ____ a text message right now.", options: ["read", "reading"], answer: 1, wrongEn: "Wrong! 'Right now' signals a progressive action (reading).", wrongAr: "خطأ! 'Right now' تشير إلى فعل مستمر (reading)." },
+                        { q: "\"What's up?\" is a way to say ____.", options: ["Hello/What is happening", "Goodbye"], answer: 0, wrongEn: "Wrong! 'What's up?' is a greeting, not a way to leave.", wrongAr: "خطأ! 'What's up?' هي تحية، وليست طريقة للمغادرة." },
+                        { q: "True/False: You can watch an action film at a food court.", options: ["True", "False"], answer: 1, wrongEn: "Wrong! You watch films at a cinema; food courts are for eating.", wrongAr: "خطأ! تشاهد الأفلام في السينما؛ صالات الطعام لتناول الأكل." },
+                        { q: "True/False: \"Good idea!\" is a way to agree with a suggestion.", options: ["True", "False"], answer: 0, wrongEn: "Wrong! 'Good idea!' is indeed used for agreeing.", wrongAr: "خطأ! 'Good idea!' تستخدم بالفعل للموافقة." }
+                    ]
+                },
+                vocabulary: {
+                    list: [
+                        { en: "Surf the net", ar: "يتصفح الإنترنت", context: "He is surfing the net for information." },
+                        { en: "Chat", ar: "دردشة", context: "I chat with my friends online." },
+                        { en: "Deliver", ar: "يوصل", context: "The man is delivering the pizza." },
+                        { en: "Hang out", ar: "يقضي وقتاً مع", context: "I hang out with my cousins." },
+                        { en: "Text message", ar: "رسالة نصية", context: "Send me a text message later." },
+                        { en: "Food court", ar: "صالة الطعام", context: "Let's eat lunch at the food court." },
+                        { en: "Action film", ar: "فيلم حركة", context: "I am watching a cool action film." },
+                        { en: "Magazine", ar: "مجلة", context: "My mother is reading a magazine." }
+                    ]
+                },
+                function: {
+                    context: "Talking on the phone or chatting about what you are doing right now.",
+                    howEn: "Use \"What's up?\" as an informal way to ask what is happening. When someone suggests an activity, \"Good idea!\" or \"Let's...\" are the best ways to agree and join in.",
+                    howAr: "استخدم \"What's up?\" كطريقة غير رسمية للسؤال عما يحدث. عندما يقترح شخص ما نشاطاً، فإن \"Good idea!\" أو \"Let's...\" هي أفضل الطرق للموافقة والمشاركة.",
+                    realTalk: ["What's up?", "Good idea!", "I'm hanging out"],
+                    dialogue: [
+                        { speaker: "Sami", text: "Hi Omar! What's up?", ar: "أهلاً عمر! ما الجديد؟" },
+                        { speaker: "Omar", text: "I'm hanging out at the mall. Let's eat lunch!", ar: "أنا أتسكع في المركز التجاري. لنأكل الغداء!" },
+                        { speaker: "Sami", text: "Good idea! I'm coming now.", ar: "فكرة جيدة! أنا قادم الآن." }
+                    ]
+                }
+            }
+        ];
+
+        // --- 3D Scene Setup ---
+        const canvas = document.querySelector('#bg-canvas');
+        const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(0, 30, 60);
+
+        const controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+
+        // Lighting
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+        scene.add(ambientLight);
+
+        const sunLight = new THREE.PointLight(0xffffff, 2, 300);
+        sunLight.position.set(0, 0, 0);
+        scene.add(sunLight);
+
+        // Sun
+        const sunGeometry = new THREE.SphereGeometry(5, 32, 32);
+        const sunMaterial = new THREE.MeshBasicMaterial({ color: 0xffdd00 });
+        const sun = new THREE.Mesh(sunGeometry, sunMaterial);
+        scene.add(sun);
+
+        // Planets
+        // Planet Texture Generator
+        function createPlanetTexture(color, number) {
+            const canvas = document.createElement('canvas');
+            canvas.width = 512;
+            canvas.height = 512;
+            const ctx = canvas.getContext('2d');
+
+            // Base Color
+            const hexColor = `#${color.toString(16).padStart(6, '0')}`;
+            ctx.fillStyle = hexColor;
+            ctx.fillRect(0, 0, 512, 512);
+
+            // "Carved" Number Effect
+            ctx.shadowColor = 'rgba(0,0,0,0.8)';
+            ctx.shadowBlur = 10;
+            ctx.shadowOffsetX = 5;
+            ctx.shadowOffsetY = 5;
+
+            ctx.fillStyle = 'rgba(0,0,0,0.6)'; // Inset look
+            ctx.font = 'bold 240px Orbitron, sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(number, 256, 256);
+
+            // Shading for 3D feel on the label
+            ctx.shadowBlur = 0;
+            ctx.shadowOffsetX = 0;
+            ctx.shadowOffsetY = 0;
+            ctx.strokeStyle = 'rgba(255,255,255,0.2)';
+            ctx.lineWidth = 4;
+            ctx.strokeText(number, 256, 256);
+
+            const texture = new THREE.CanvasTexture(canvas);
+            texture.anisotropy = renderer.capabilities.getMaxAnisotropy();
+            return texture;
+        }
+
+        const planetMeshes = [];
+        const planetData = [
+            { name: "Mercury", size: 0.8, dist: 10, speed: 0.02, color: 0xaaaaaa },
+            { name: "Venus", size: 1.2, dist: 15, speed: 0.015, color: 0xe3bb76 },
+            { name: "Earth", size: 1.3, dist: 20, speed: 0.01, color: 0x2233ff },
+            { name: "Mars", size: 1.1, dist: 25, speed: 0.008, color: 0xff4422 },
+            { name: "Jupiter", size: 3.5, dist: 35, speed: 0.005, color: 0xd39c7e },
+            { name: "Saturn", size: 3.0, dist: 45, speed: 0.003, color: 0xc5ab6e },
+            { name: "Uranus", size: 2.2, dist: 55, speed: 0.002, color: 0xbbeeff },
+            { name: "Neptune", size: 2.1, dist: 65, speed: 0.001, color: 0x6081ff },
+        ];
+
+        planetData.forEach((data, index) => {
+            const group = new THREE.Group();
+
+            // Orbit Ring
+            const orbitGeom = new THREE.RingGeometry(data.dist - 0.1, data.dist + 0.1, 64);
+            const orbitMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.1, side: THREE.DoubleSide });
+            const orbit = new THREE.Mesh(orbitGeom, orbitMat);
+            orbit.rotation.x = Math.PI / 2;
+            scene.add(orbit);
+
+            // Planet Mesh
+            const geom = new THREE.SphereGeometry(data.size, 32, 32);
+            const texture = createPlanetTexture(data.color, index + 1);
+            const mat = new THREE.MeshStandardMaterial({
+                map: texture,
+                roughness: 0.7,
+                metalness: 0.2
+            });
+            const mesh = new THREE.Mesh(geom, mat);
+
+            // Halo/Glow (Mastered state)
+            const glowGeom = new THREE.SphereGeometry(data.size * 1.2, 32, 32);
+            const glowMat = new THREE.MeshBasicMaterial({
+                color: data.color,
+                transparent: true,
+                opacity: 0,
+                side: THREE.BackSide
+            });
+            const glow = new THREE.Mesh(glowGeom, glowMat);
+            mesh.add(glow);
+
+            group.add(mesh);
+            scene.add(group);
+
+            planetMeshes.push({
+                group,
+                mesh,
+                glow,
+                dist: data.dist,
+                speed: data.speed,
+                angle: Math.random() * Math.PI * 2,
+                unitIndex: index
+            });
+        });
+
+        // Background Stars
+        const starsGeometry = new THREE.BufferGeometry();
+        const starsCount = 5000;
+        const posArray = new Float32Array(starsCount * 3);
+        for (let i = 0; i < starsCount * 3; i++) {
+            posArray[i] = (Math.random() - 0.5) * 400;
+        }
+        starsGeometry.setAttribute('position', new THREE.BufferAttribute(posArray, 3));
+        const starsMaterial = new THREE.PointsMaterial({ size: 0.1, color: 0xffffff });
+        const starField = new THREE.Points(starsGeometry, starsMaterial);
+        scene.add(starField);
+
+        // --- State ---
+        let selectedPlanet = null;
+        let totalPoints = 0;
+        let isTransitioning = false;
+        const tempVector = new THREE.Vector3();
+
+        // --- Interaction ---
+        const raycaster = new THREE.Raycaster();
+        const mouse = new THREE.Vector2();
+
+        window.addEventListener('click', (event) => {
+            if (event.target !== canvas || isTransitioning) return;
+
+            mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+            raycaster.setFromCamera(mouse, camera);
+            const intersects = raycaster.intersectObjects(planetMeshes.map(p => p.mesh));
+
+            if (intersects.length > 0) {
+                const hit = intersects[0].object;
+                const planet = planetMeshes.find(p => p.mesh === hit);
+                selectPlanet(planet);
+            }
+        });
+
+        function selectPlanet(planet) {
+            if (selectedPlanet === planet) return;
+            selectedPlanet = planet;
+            const unit = units[planet.unitIndex];
+
+            document.getElementById('planet-title').innerText = unit.name;
+            document.getElementById('planet-subtitle').innerText = unit.focus;
+            const panel = document.getElementById('planet-info');
+            panel.style.display = 'flex';
+            setTimeout(() => panel.classList.add('active'), 10);
+
+            renderTab('grammar');
+
+            // Zoom camera
+            controls.enabled = false;
+            isTransitioning = true;
+        }
+
+        document.querySelector('.close-btn').addEventListener('click', () => {
+            const panel = document.getElementById('planet-info');
+            panel.classList.remove('active');
+            setTimeout(() => panel.style.display = 'none', 300);
+            selectedPlanet = null;
+            controls.enabled = true;
+            isTransitioning = true;
+        });
+
+        // Tabs
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                renderTab(btn.dataset.tab);
+            });
+        });
+
+        function renderTab(tabId) {
+            const content = document.getElementById('tab-content');
+            const unit = units[selectedPlanet.unitIndex];
+
+            if (tabId === 'grammar') {
+                content.innerHTML = `
+                    <div class="grammar-note-card">
+                        <div style="font-weight:700; color:#818cf8; margin-bottom:8px; display:flex; align-items:center; gap:8px;">
+                            <span style="font-size:1.2em;">👨‍🏫</span> Teacher's Note / ملاحظة المعلم
+                        </div>
+                        <div style="line-height:1.6; color:#e2e8f0; margin-bottom:12px;">${unit.grammar.noteEn}</div>
+                        <div style="line-height:1.6; color:#94a3b8; font-style:italic;" dir="rtl">${unit.grammar.noteAr}</div>
+                    </div>
+                    
+                    <div class="grammar-matrix">
+                        <div class="matrix-cell">
+                            <div class="matrix-header">Form / الصيغة</div>
+                            ${unit.grammar.form.map(f => `<div style="margin-bottom:8px; color:#e2e8f0;">${f}</div>`).join('')}
+                        </div>
+                        <div class="matrix-cell">
+                            <div class="matrix-header">Example / مثال</div>
+                            ${unit.grammar.examples.map(e => `<div style="margin-bottom:8px; color:#818cf8;">• ${e}</div>`).join('')}
+                        </div>
+                        <div class="matrix-cell" style="border-right:none;">
+                            <div class="matrix-header">Logic / المنطق</div>
+                            ${unit.grammar.logic.map(l => `<div style="margin-bottom:8px; color:#94a3b8;">- ${l}</div>`).join('')}
+                        </div>
+                    </div>
+
+                    <div class="grammar-note-card" style="margin-top:32px; border:1px dashed var(--primary); background:rgba(129, 140, 248, 0.05);">
+                        <div style="display:flex; justify-content:space-between; align-items:center;">
+                            <div>
+                                <div style="font-weight:700; color:#818cf8;">READY TO PRACTICE?</div>
+                                <div style="color:#94a3b8; font-size:0.9em;">Head over to the Practice tab to test your knowledge!</div>
+                            </div>
+                            <button class="option-btn" style="width:auto; padding:8px 20px;" onclick="document.querySelector('[data-tab=practice]').click()">Go to Practice</button>
+                        </div>
+                    </div>
+                `;
+            } else if (tabId === 'vocabulary') {
+                content.innerHTML = `
+                <div class="vocab-grid">
+                    ${unit.vocabulary.list.map(v => `
+                        <div class="vocab-card">
+                            <div style="display:flex; justify-content:space-between; align-items:start;">
+                                <div>
+                                    <div style="font-size:1.2em; font-weight:700; color:#fff; margin-bottom:4px;">${v.en}</div>
+                                    <div style="color:var(--primary); font-size:1em; font-weight:500;">${v.ar}</div>
+                                </div>
+                                <button class="speaker-btn" onclick="speakWord('${v.en.replace(/'/g, "\\'")}', this)">
+                                    <span>🔊</span>
+                                </button>
+                            </div>
+                            <div class="context-sentence">${v.context}</div>
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+            } else if (tabId === 'function') {
+                content.innerHTML = `
+                <div class="function-context">
+                    <span>Target Context: ${unit.function.context}</span>
+                </div>
+                
+                <div class="function-columns">
+                    <div class="function-col" style="color:#e2e8f0; font-size:1.05em;">
+                        <div style="font-weight:700; font-size:0.75em; opacity:0.6; margin-bottom:10px; text-transform:uppercase;">English Explanation</div>
+                        ${unit.function.howEn}
+                    </div>
+                    <div class="function-col" style="color:#94a3b8; font-size:1.05em;" dir="rtl">
+                        <div style="font-weight:700; font-size:0.75em; opacity:0.6; margin-bottom:10px; text-transform:uppercase;">كيفية العمل</div>
+                        ${unit.function.howAr}
+                    </div>
+                </div>
+
+                <div class="realtalk-section">
+                    <div class="realtalk-header">
+                        <span>REAL TALK PHRASES</span>
+                        <span>اضغط للاستماع / Click to listen</span>
+                    </div>
+                    <div class="realtalk-grid">
+                        ${unit.function.realTalk.map(p => `
+                            <button class="phrase-btn" onclick="speakWord('${p.replace(/'/g, "\\'")}', this)">
+                                <span>🔊</span> ${p}
+                            </button>
+                        `).join('')}
+                    </div>
+                </div>
+
+                <div class="dialogue-section">
+                    <div class="realtalk-header">
+                        <span>REAL CONTEXT DIALOGUE</span>
+                        <span>اضغط على الفقاعة للاستماع / Click bubble to listen</span>
+                    </div>
+                    ${unit.function.dialogue ? unit.function.dialogue.map(d => `
+                        <div class="dialogue-bubble" onclick="speakWord('${d.text.replace(/'/g, "\\'")}', this)">
+                            <div class="dialogue-speaker">${d.speaker}</div>
+                            <div class="dialogue-text"><span>🔊</span> ${d.text}</div>
+                            <div class="dialogue-ar" dir="rtl">${d.ar}</div>
+                        </div>
+                    `).join('') : ''}
+                </div>
+            `;
+            } else if (tabId === 'practice') {
+                content.innerHTML = `
+                    <div style="margin-top:10px;">
+                        <div style="font-weight:700; color:#818cf8; margin-bottom:20px; font-family:'Orbitron', sans-serif; display:flex; justify-content:space-between; align-items:center;">
+                            <span>MISSION PRACTICE</span>
+                            <span dir="rtl">مهام التدريب</span>
+                        </div>
+                        <div class="practice-container">
+                            ${unit.practice.questions.map((q, qIdx) => `
+                                <div class="practice-card">
+                                    <div class="question-text">${q.q}</div>
+                                    <div class="options-grid">
+                                        ${q.options.map((opt, oIdx) => `
+                                            <button class="option-btn" onclick="checkAnswer(this, ${qIdx}, ${oIdx})">${opt}</button>
+                                        `).join('')}
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                `;
+            }
+
+            // Mark completion
+            unit.completedTabs.add(tabId);
+        }
+
+        window.checkAnswer = function (btn, qIdx, oIdx) {
+            const unit = units[selectedPlanet.unitIndex];
+            const q = unit.practice.questions[qIdx];
+
+            if (oIdx === q.answer) {
+                btn.style.background = "#22c55e";
+                btn.style.borderColor = "#22c55e";
+                btn.style.color = "#fff";
+                btn.style.transform = "scale(0.98)";
+                btn.innerText = "✓ Correct!";
+
+                // Add points
+                updatePoints(10);
+
+                // Confetti for correct answer
+                confetti({
+                    particleCount: 30,
+                    spread: 40,
+                    origin: { y: 0.6 },
+                    colors: ['#818cf8', '#c084fc', '#22c55e']
+                });
+            } else {
+                btn.style.background = "#ef4444";
+                btn.style.borderColor = "#ef4444";
+                btn.style.color = "#fff";
+                showToast(q.wrongEn, q.wrongAr);
+            }
+        }
+
+        function showToast(en, ar) {
+            const toast = document.createElement('div');
+            toast.className = 'learning-toast';
+            toast.innerHTML = `
+                <div>${en}</div>
+                <div class="toast-ar">${ar}</div>
+            `;
+            document.body.appendChild(toast);
+
+            // Trigger animation
+            setTimeout(() => toast.classList.add('show'), 100);
+
+            // Remove after 5s
+            setTimeout(() => {
+                toast.classList.remove('show');
+                setTimeout(() => toast.remove(), 400);
+            }, 5000);
+        }
+
+        function updatePoints(val) {
+            totalPoints += val;
+            document.getElementById('total-points').innerText = totalPoints;
+
+            // Check mastery
+            const unit = units[selectedPlanet.unitIndex];
+            if (unit.completedTabs.size >= 4) {
+                selectedPlanet.glow.material.opacity = 0.5;
+                // Celebration!
+                confetti({
+                    particleCount: 150,
+                    spread: 70,
+                    origin: { y: 0.6 },
+                    colors: ['#818cf8', '#c084fc', '#f472b6']
+                });
+            }
+        }
+
+        // --- Animation Loop ---
+        function animate() {
+            requestAnimationFrame(animate);
+
+            planetMeshes.forEach(p => {
+                p.angle += p.speed * 0.5;
+                p.group.position.x = Math.cos(p.angle) * p.dist;
+                p.group.position.z = Math.sin(p.angle) * p.dist;
+                p.mesh.rotation.y += 0.01;
+
+                // Pulsate glow if mastered
+                if (p.glow.material.opacity > 0) {
+                    p.glow.scale.setScalar(1.2 + Math.sin(Date.now() * 0.005) * 0.1);
+                    p.glow.material.opacity = 0.3 + Math.sin(Date.now() * 0.005) * 0.2;
+                }
+            });
+
+            sun.rotation.y += 0.005;
+            starField.rotation.y += 0.0001;
+
+            if (selectedPlanet && isTransitioning) {
+                // Smooth camera move to planet
+                selectedPlanet.mesh.getWorldPosition(tempVector);
+                const targetPos = tempVector.clone().add(new THREE.Vector3(0, 5, 8));
+                camera.position.lerp(targetPos, 0.08);
+                controls.target.lerp(tempVector, 0.08);
+                if (camera.position.distanceTo(targetPos) < 0.01) isTransitioning = false;
+            } else if (!selectedPlanet && isTransitioning) {
+                // Return to home
+                const homePos = new THREE.Vector3(0, 30, 60);
+                const homeTarget = new THREE.Vector3(0, 0, 0);
+                camera.position.lerp(homePos, 0.08);
+                controls.target.lerp(homeTarget, 0.08);
+                if (camera.position.distanceTo(homePos) < 0.01) isTransitioning = false;
+            }
+
+            controls.update();
+            renderer.render(scene, camera);
+        }
+
+        window.speakWord = function (text, btn) {
+            if (!window.speechSynthesis) return;
+            window.speechSynthesis.cancel();
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.lang = 'en-US';
+            utterance.rate = 0.9;
+            utterance.onstart = () => btn.classList.add('playing');
+            utterance.onend = () => btn.classList.remove('playing');
+            utterance.onerror = () => btn.classList.remove('playing');
+            window.speechSynthesis.speak(utterance);
+        };
+
+        animate();
+
+        // Responsive
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+    </script>
+</body>
+
+</html>
