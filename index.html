@@ -58,15 +58,49 @@
         }
 
         .glass-panel {
-            background: #0f172a;
-            /* Solid dark blue/slate */
-            border: 1px solid rgba(255, 255, 255, 0.2);
+            background: rgba(15, 23, 42, 0.8);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.15);
             border-radius: 24px;
             padding: 24px;
             pointer-events: auto;
             box-shadow: 0 20px 50px rgba(0, 0, 0, 0.9);
             transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
             z-index: 10000;
+        }
+
+        .mobile-controls {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+            pointer-events: auto;
+        }
+
+        .nav-btn {
+            background: rgba(129, 140, 248, 0.2);
+            border: 1px solid var(--primary-glow);
+            color: white;
+            padding: 10px 15px;
+            border-radius: 12px;
+            cursor: pointer;
+            font-family: 'Orbitron', sans-serif;
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.2s;
+            flex: 1;
+            justify-content: center;
+        }
+
+        .nav-btn:hover {
+            background: var(--primary);
+            box-shadow: 0 0 15px var(--primary-glow);
+        }
+
+        .nav-btn:active {
+            transform: scale(0.95);
         }
 
         #hud {
@@ -321,6 +355,25 @@
             #planet-info {
                 height: 85vh;
                 bottom: 20px;
+                width: 95%;
+                padding: 16px;
+            }
+
+            .vocab-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .function-columns {
+                grid-template-columns: 1fr;
+            }
+
+            .tabs {
+                flex-wrap: wrap;
+            }
+
+            .tab-btn {
+                padding: 8px;
+                font-size: 12px;
             }
         }
 
@@ -555,6 +608,14 @@
             <div class="points-display">TOTAL POINTS: <span id="total-points">0</span></div>
             <div id="planet-status" style="margin-top: 10px; font-size: 14px; opacity: 0.8;">
                 Click a planet to start learning
+            </div>
+            <div class="mobile-controls">
+                <button class="nav-btn" onclick="navPlanet(-1)">
+                    <span>◀</span> PREV
+                </button>
+                <button class="nav-btn" onclick="navPlanet(1)">
+                    NEXT <span>▶</span>
+                </button>
             </div>
         </div>
     </div>
@@ -1190,17 +1251,44 @@
         let selectedPlanet = null;
         let totalPoints = 0;
         let isTransitioning = false;
+        let isOrbitPaused = false; // For movement stability
         const tempVector = new THREE.Vector3();
+
+        // Touch handling
+        let touchStartX = 0;
+        let touchStartY = 0;
 
         // --- Interaction ---
         const raycaster = new THREE.Raycaster();
         const mouse = new THREE.Vector2();
 
         window.addEventListener('click', (event) => {
-            if (event.target !== canvas || isTransitioning) return;
+            handleInteraction(event.clientX, event.clientY);
+        });
 
-            mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-            mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+        window.addEventListener('touchstart', (event) => {
+            touchStartX = event.touches[0].clientX;
+            touchStartY = event.touches[0].clientY;
+        }, { passive: false });
+
+        window.addEventListener('touchend', (event) => {
+            if (event.changedTouches.length > 0) {
+                const touchEndX = event.changedTouches[0].clientX;
+                const touchEndY = event.changedTouches[0].clientY;
+
+                // If it was a tap (not a drag)
+                const dist = Math.sqrt(Math.pow(touchEndX - touchStartX, 2) + Math.pow(touchEndY - touchStartY, 2));
+                if (dist < 10) {
+                    handleInteraction(touchEndX, touchEndY);
+                }
+            }
+        }, { passive: false });
+
+        function handleInteraction(clientX, clientY) {
+            if (isTransitioning) return;
+
+            mouse.x = (clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(clientY / window.innerHeight) * 2 + 1;
 
             raycaster.setFromCamera(mouse, camera);
             const intersects = raycaster.intersectObjects(planetMeshes.map(p => p.mesh));
@@ -1210,11 +1298,12 @@
                 const planet = planetMeshes.find(p => p.mesh === hit);
                 selectPlanet(planet);
             }
-        });
+        }
 
         function selectPlanet(planet) {
             if (selectedPlanet === planet) return;
             selectedPlanet = planet;
+            isOrbitPaused = true; // Pause orbit when a planet is selected
             const unit = units[planet.unitIndex];
 
             document.getElementById('planet-title').innerText = unit.name;
@@ -1230,11 +1319,22 @@
             isTransitioning = true;
         }
 
+        window.navPlanet = function (direction) {
+            let currentIndex = selectedPlanet ? selectedPlanet.unitIndex : -1;
+            let nextIndex = currentIndex + direction;
+
+            if (nextIndex < 0) nextIndex = planetMeshes.length - 1;
+            if (nextIndex >= planetMeshes.length) nextIndex = 0;
+
+            selectPlanet(planetMeshes[nextIndex]);
+        };
+
         document.querySelector('.close-btn').addEventListener('click', () => {
             const panel = document.getElementById('planet-info');
             panel.classList.remove('active');
             setTimeout(() => panel.style.display = 'none', 300);
             selectedPlanet = null;
+            isOrbitPaused = false; // Resume orbit when panel is closed
             controls.enabled = true;
             isTransitioning = true;
         });
@@ -1449,9 +1549,13 @@
             requestAnimationFrame(animate);
 
             planetMeshes.forEach(p => {
-                p.angle += p.speed * 0.5;
-                p.group.position.x = Math.cos(p.angle) * p.dist;
-                p.group.position.z = Math.sin(p.angle) * p.dist;
+                // Orbital movement - pause if isOrbitPaused is true
+                if (!isOrbitPaused) {
+                    p.angle += p.speed * 0.5;
+                    p.group.position.x = Math.cos(p.angle) * p.dist;
+                    p.group.position.z = Math.sin(p.angle) * p.dist;
+                }
+
                 p.mesh.rotation.y += 0.01;
 
                 // Pulsate glow if mastered
